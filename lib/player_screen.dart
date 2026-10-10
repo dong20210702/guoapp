@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'app_layout.dart';
 import 'app_orientation.dart';
@@ -112,6 +113,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool? _systemFullscreen;
   Orientation? _lastOrientation;
   bool _closed = false;
+  bool _wakelockEnabled = false;
   bool _acceptErrors = false;
   bool _foreground = true;
   bool _playIntent = true;
@@ -441,12 +443,23 @@ class _PlayerScreenState extends State<PlayerScreen>
       });
     }
   }
-
+  void _updateWakelock(bool enabled) {
+  if (_closed || _wakelockEnabled == enabled) return;
+  _wakelockEnabled = enabled;
+  if (enabled) {
+    WakelockPlus.enable();
+  } else {
+    WakelockPlus.disable();
+  }
+  }
   void _applyLifecycleVisibility({bool pauseWhenHidden = true}) {
     final visible =
         _lifecycleState == AppLifecycleState.resumed ||
         _pictureInPictureVisible;
     _foreground = visible;
+    if (!visible) {
+  _updateWakelock(false);
+    }
     _enhancement.setForeground(_foreground);
     _syncDanmaku();
     _syncPreload();
@@ -1450,6 +1463,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   @override
   void dispose() {
     _closed = true;
+    WakelockPlus.disable();
     final enhancementClosed = _enhancement.close();
     LanController.current?.detachPlayback(_lanIdentity);
     widget.handoff?.fail('接收端已退出播放');
